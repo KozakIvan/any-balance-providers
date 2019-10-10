@@ -30,20 +30,45 @@ function handleRedirect(html){
 		params.fid = hex_md5(prefs.login);
 		var delay = getParam(form, /<form[^>]+data-submit-delay="([^"]*)/i, replaceHtmlEntities, parseBalance) || 0;
 		if(delay > 0){
-			AnyBalance.trace('Необходимо подождать ' + delay + ' сек');
-			AnyBalance.sleep(delay*100);
+			AnyBalance.trace('Необходимо подождать ' + delay + ' милисек');
+			AnyBalance.sleep(delay);
 		}
+
 		html = AnyBalance.requestPost(joinUrl(ref, action), params, addHeaders({Referer: ref}));
 	}
 	return html;
 }
 
+function patchRequests(){
+	//Иногда попадаются ссылки с пробелом
+	var post = AnyBalance.requestPost;
+	var fget = AnyBalance.requestGet;
+
+	function req(func, url, args){
+		args[0] = url.replace(/\s/g, '%20');
+		if(url != args[0]){
+			AnyBalance.trace('Invalid url detected, patched: ' + url);
+		}
+		return func.apply(AnyBalance, args);
+	}
+
+	AnyBalance.requestPost = function(url){
+		return req(post, url, arguments);
+	}
+
+	AnyBalance.requestGet = function(url){
+		return req(fget, url, arguments);
+	}
+}
+
 function main(){
+	patchRequests();
+
     var prefs = AnyBalance.getPreferences();
 	AnyBalance.setDefaultCharset('utf-8');
 	
 	var prefs = AnyBalance.getPreferences();
-	var baseurl = 'https://mini.webmoney.ru/';
+	var baseurl = 'https://wallet.webmoney.ru/';
 	var baseurlLogin = 'https://login.wmtransfer.com/';
 
 	AB.checkEmpty(prefs.login, 'Введите логин!');
@@ -59,11 +84,29 @@ function main(){
 		throw new AnyBalance.Error('Сайт провайдера временно недоступен! Попробуйте обновить данные позже.');
 	}
 
-	if(!/logout/i.test(html)){
+	var elements;
+	if(/signoff/i.test(html)){
+		var fns = AnyBalance.requestGet(baseurl + 'srv/finance/entities', addHeaders({
+			Accept: 'application/json, text/plain, */*',
+			Referer: baseurl + 'finances'
+		}));
+		try{
+			elements = getJson(fns);
+			if(/denied/i.test(elements.Message))
+				throw new AnyBalance.Error(elements.Message);
+			AnyBalance.trace('Удалось войти в предыдущей сессии');
+		}catch(e){
+			AnyBalance.trace('test of login failed, should relogin: ' + e.message);
+			AB.clearAllCookies();
+			html = AnyBalance.requestGet(baseurl, g_headers);
+		}
+	}
+	
+	if(!/signoff/i.test(html)){
 		AnyBalance.trace('Мгновенно не зашли');
 
-		var signonUrl = getParam(html, null, null, /singleSignOnUrl:\s*'([^']*)/, replaceSlashes);
-		var logonUrl = getParam(html, null, null, /logOnUrl\s*=\s*new\s+Uri\s*\(\s*'([^']*)/, replaceSlashes);
+		var signonUrl = getParam(html, /singleSignOnUrl:\s*'([^']*)/, replaceSlashes);
+		var logonUrl = getParam(html, /logOnUrl\s*=\s*new\s+Uri\s*\(\s*'([^']*)/, replaceSlashes);
 		var info = {};
 		if(signonUrl){
 			AnyBalance.trace('Но есть возможность проверить автовход');
@@ -79,7 +122,7 @@ function main(){
 		if(!info.loggedOn){
 			AnyBalance.trace('Автовход не удался, пробуем всё заново авторизовывать');
 
-			ref = getParam(html, null, null, /<a[^>]+href="([^"]*)[^>]+sign-in/i, replaceHtmlEntities);
+			ref = getParam(html, null, null, /<a[^>]+top-panel__button--enter[^>]+href="([^"]*)/i, replaceHtmlEntities);
 			AnyBalance.trace('Ссылка на вход: ' + ref);
 	        
 			html = AnyBalance.requestGet(joinUrl(baseurl, ref), addHeaders({Referer: baseurl + 'welcome.aspx?ReturnUrl=%2f'}));
@@ -206,7 +249,7 @@ function main(){
 		}
 	    
 		ref = AnyBalance.getLastUrl();
-		if(!/Completed/i.test(ref)){
+		if(!/Completed|init=true/i.test(ref)){
 			var error = getElement(html, /<span[^>]+field-validation-error/i, replaceTagsAndSpaces);
 			if(error)
 				throw new AnyBalance.Error(error, null, /парол|Пользовател/i.test(error));
@@ -220,10 +263,12 @@ function main(){
 		ref = AnyBalance.getLastUrl();
 	    
 		form = getElement(html, /<form[^>]+gk-form/i);
-		params = createFormParams(form);
-		action = getParam(form, null, null, /<form[^>]+action="([^"]*)/i, replaceHtmlEntities);
-		html = AnyBalance.requestPost(joinUrl(ref, action), params, addHeaders({Referer: ref}));
-		ref = AnyBalance.getLastUrl();
+		if(form){
+			params = createFormParams(form);
+			action = getParam(form, null, null, /<form[^>]+action="([^"]*)/i, replaceHtmlEntities);
+			html = AnyBalance.requestPost(joinUrl(ref, action), params, addHeaders({Referer: ref}));
+			ref = AnyBalance.getLastUrl();
+		}
 
 		if(/ctl00\$cph\$btnStd/i.test(html)){
 			AnyBalance.trace('Обнаружена промежуточная страница, переходим на стандартный кошелек');
@@ -245,27 +290,40 @@ function main(){
 		__setLoginSuccessful();
 	}
 
-	html = AnyBalance.requestGet(baseurl + 'purses-view-history.aspx', g_headers);
-
 	var result = {
 		success: true
 	};
 
-	var elements = getElements(html, /<[^>]+rptPurses/ig);
+	if(!elements){
+		html = AnyBalance.requestGet(baseurl + 'srv/finance/entities', addHeaders({
+			Accept: 'application/json, text/plain, */*',
+			Referer: baseurl + 'finances'
+		}));
+	    
+		elements = getJson(html);
+	}
+
 	AnyBalance.trace('Найдено ' + elements.length + ' кошельков');
 
 	for(var i=0; i<elements.length; ++i){
 		var e = elements[i];
-		var num = getElement(e, /<[^>]+item-description/i, replaceTagsAndSpaces);
-		var sum = getElement(e, /<[^>]+summ/i, replaceTagsAndSpaces);
-		AnyBalance.trace(num + ': ' + sum);
-		var curr = parseCurrency(sum);
+		var num = e.number;
+		var sum = e.summ;
+		var curr = e.currency;
+		AnyBalance.trace(num + ': ' + sum + ' ' + curr);
 
-		sumParam(sum, result, curr.toLowerCase(), null, null, parseBalance, aggregate_sum);
+		sumParam('' + sum, result, curr.toLowerCase(), null, null, parseBalance, aggregate_sum);
 		sumParam(num, result, curr.toLowerCase() + '_num', null, null, null, aggregate_join);
 	}
 
-    getParam(html, result, '__tariff', /WMID:([^<]*)/i, replaceTagsAndSpaces);
+	html = AnyBalance.requestGet(baseurl + 'srv/profile/info', addHeaders({
+		Accept: 'application/json, text/plain, */*',
+		Referer: baseurl + 'finances'
+	}));
+
+	var json = getJson(html);
+    getParam(json.wmid, result, '__tariff');
+    getParam(json.fullName, result, 'fio');
 
     AnyBalance.setResult(result);
 }

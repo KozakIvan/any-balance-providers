@@ -31,7 +31,21 @@ function main(){
         throw new AnyBalance.Error('Ошибка при подключении к сайту провайдера! Попробуйте обновить данные позже.');
     }
 
-    var params = { password: prefs.password };
+    var form = getElement(html, /<form[^>]+loginForm/i);
+    if(!form){
+        AnyBalance.trace(html);
+        throw new AnyBalance.Error('Не удалось найти форму входа. Сайт изменен?');
+    }
+    
+	var params = AB.createFormParams(form, function(params, str, name, value) {
+		if (name == 'email') {
+			return prefs.login;
+		} else if (name == 'password') {
+			return prefs.password;
+		}
+
+		return value;
+	});
 
     if (/^[a-z0-9_\.-]+@[a-z0-9_\.-]+$/i.test(prefs.login)) {
         AB.checkEmpty(prefs.password, 'Введите пароль!');
@@ -54,7 +68,7 @@ function main(){
         }
     }
 
-    var html = AnyBalance.requestPost(baseurl + 'user/session/login.do?continue=%2Fcatalog%2Fproduct%2Fwelcome.do&', params, addHeaders({
+    var html = AnyBalance.requestPost(baseurl + 'user/session/login.do?continue=%2F', params, addHeaders({
         Referer: baseurl + 'user/session/login.do'
     }));
 
@@ -93,7 +107,7 @@ function main(){
     AB.getParam(html, result, 'nextlevel', /Совершите покупки еще на([^<]*?)руб/i,           AB.replaceTagsAndSpaces, AB.parseBalance);
 
     var bonuses = getParam(html, /bonuses:\s*(\[\{[\s\S]*?\}\])/, replaceHtmlEntities, getJson);
-    var tillbonus = bonuses.reduce(function(b, prev) { if(!prev || b.dateEnd < prev.dateEnd) prev = b; return prev });
+    var tillbonus = (bonuses || []).reduce(function(b, prev) { if(!prev || b.dateEnd < prev.dateEnd) prev = b; return prev }, 0);
     getParam(tillbonus && tillbonus.dateEnd, result, 'till');
     getParam(tillbonus && tillbonus.amount, result, 'sumtill');
 	

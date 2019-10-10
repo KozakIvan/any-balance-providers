@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<history>
+	<change version="1" date="2017-08-04">
+	- Initial version.
+	</change>
+	<change version="2" date="2018-06-07">
+	- Support TLS1, should allow using this provider on older Android versions.
+	</change>
+</history>

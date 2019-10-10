@@ -1,13 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <provider>
 	<api flags="no_browser" />
-	<id version="9">ab-cell-pildyk</id>
+	<id version="11">ab-cell-pildyk</id>
 	<name>Pildyk</name>
 	<description html="true"><![CDATA[
 	<p>Предоставляет информацию о балансе провайдера Pildyk <a href="www.pildyk.lt">www.pildyk.lt</a></p>
 	<p>Информация берется из личного кабинета <a href="https://mano.pildyk.lt/">https://mano.pildyk.lt/</a></p>
 	]]></description>
-	<author>Ilya Laptev &lt;ia.laptev@gmail.com&gt;</author>
 	<author>AnyBalance Team &lt;info@anybalance.ru&gt;</author>
 	<files>
 		<icon>icon.png</icon>
@@ -18,10 +17,13 @@
 	</files>
 	<counters>
 		<counter id="balance" name="Баланс" units=" €"/>
+		<counter id="bonus" name="Бонусы" units=" Б"/>
 		<counter id="balanceExpire" name="Дата сгорания баланса" type="time" format="dd/MM/yyyy"/>
 		<counter id="name" name="Владелец" type="text"/>
 		<counter id="telnum" name="Номер телефона" type="text"/>
 		<counter id="traf_left" name="Остаток трафика" units=" Мб"/>
+		<counter id="addonData" name="Дополнительный трафик" units=" Мб"/>
+		<counter id="addonMin" name="Дополнительное время" units=" мин"/>
 	</counters>
 	<keywords>pildyk</keywords>
 	<type>cell</type>

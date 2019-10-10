@@ -1,4 +1,4 @@
-﻿/**
+/**
 Провайдер AnyBalance (http://any-balance-providers.googlecode.com)
 */
 
@@ -12,7 +12,7 @@ var g_headers = {
 
 function main() {
 	var prefs = AnyBalance.getPreferences();
-	var baseurl = 'https://my.domtele.com/';
+	var baseurl = 'https://my.datagroup.ua/';
 	
 	//AnyBalance.setDefaultCharset('utf-8');
 	AnyBalance.setDefaultCharset('windows-1251');	
@@ -48,9 +48,9 @@ function main() {
 		
 	getParam(html, result, 'balance', /Баланс:[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i, [replaceTagsAndSpaces, /Долг([\s\d.,]+)/i, '- $1'], parseBalance);
 	getParam(html, result, 'fio', /Абонент:[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
-	getParam(html, result, 'account', /Номер договора:[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
-	getParam(html, result, 'lic_account', /Лицевой Счет:[\s\S]*?<td[^>]*>([\s\S]*?)(?:<\/b|<\/td>)/i, replaceTagsAndSpaces);
-	getParam(html, result, 'connection', /Подключение:[\s\S]*?<td[^>]*>([\s\S]*?)(?:\*|<\/td>)/i, replaceTagsAndSpaces);
+	getParam(html, result, 'account', /(?:Номер договора|Номер договору):[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
+	getParam(html, result, 'lic_account', /(?:Лицевой Счет|Особистий Рахунок):[\s\S]*?<td[^>]*>([\s\S]*?)(?:<\/b|<\/td>)/i, replaceTagsAndSpaces);
+	getParam(html, result, 'connection', /(?:Подключение|Підключення):[\s\S]*?<td[^>]*>([\s\S]*?)(?:\*|<\/td>)/i, replaceTagsAndSpaces);
 	getParam(html, result, 'status', /Статус:[\s\S]*?<td[^>]*>([\s\S]*?)(?:<\/b|<\/td>)/i, replaceTagsAndSpaces);
      
 	html = AnyBalance.requestPost(baseurl, {

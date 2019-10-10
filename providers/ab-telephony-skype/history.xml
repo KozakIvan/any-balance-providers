@@ -1,5 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <history>
+	<change major_version="2" version="35" date="2019-08-02">
+	- Поддержка запроса на проверку учетных данных
+	</change>
+	<change major_version="2" version="34" date="2018-05-22">
+	- Поддержка изменений на сайте.
+	</change>
+	<change major_version="2" version="33" date="2018-02-16">
+	Support changes in login procedure
+	</change>
+	<change major_version="2" version="32" date="2017-10-24">
+	- Улучшена обработка ошибок.
+	</change>
 	<change major_version="2" version="31" date="2017-02-10">
 	- Улучшена обработка ошибок.
 	</change>

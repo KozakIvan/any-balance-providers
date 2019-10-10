@@ -1,5 +1,5 @@
 var g_api_headers = {
-    'User-Agent': 'MLK Android Phone 1.2.1',
+    'User-Agent': 'MLK Android Phone 3.3.10',
     'Connection': 'Keep-Alive'
 };
 
@@ -25,11 +25,13 @@ function callAPI(method, url, params, allowerror) {
     }else
         html = AnyBalance.requestGet(api_url + url, g_api_headers);
 
-    var json;
-    try{
-        json = getJson(html);
-    }catch(e){
-        json = getJsonEval(html);
+    var json = {};
+    if(html){
+        try{
+            json = getJson(html);
+        }catch(e){
+            json = getJsonEval(html);
+        }
     }
 
     if(json.code && !allowerror) {
@@ -41,6 +43,8 @@ function callAPI(method, url, params, allowerror) {
 
 function megafonLkAPILogin(options){
     var prefs = AnyBalance.getPreferences();
+    options = options || {};
+
     AnyBalance.setDefaultCharset('utf-8');
 
     checkEmpty(prefs.login && /^\d{10}$/.test(prefs.login), 'Введите 10 цифр номера телефона без пробелов и разделителей в качестве логина!');
@@ -77,7 +81,7 @@ function megafonLkAPILogin(options){
         if (json.code) {
             if (json.code == 'a211' && options.allow_captcha) { //Капча
                 var capchaImg = AnyBalance.requestGet(api_url + 'auth/captcha', g_api_headers);
-                var captcha = AnyBalance.retrieveCode('Мегафон иногда требует подтвердить, что вы не робот. Сейчас как раз такой случай. Если вы введете цифры с картинки, то мы сможем получить какую-то информацию помимо баланса. В противном случае получим только баланс.\n\nВы можете отключить показ капчи совсем или только ночью в настройках провайдера.', capchaImg, {inputType: 'number'});
+                var captcha = AnyBalance.retrieveCode('Мегафон иногда требует подтвердить, что вы не робот. Сейчас как раз такой случай.\n\nЧтобы уменьшить вероятность требования капчи, используйте опцию входа без пароля с однократным вводом кода из SMS при первом обновлении баланса.', capchaImg, {/*inputType: 'number'*/});
                 json = callAPI('post', 'login', {
                     login: prefs.login,
                     password: prefs.password,
@@ -93,18 +97,105 @@ function megafonLkAPILogin(options){
     }
 }
 
+function randomId(){
+	var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	var out = '';
+	for(var i=0; i<11; ++i){
+		out += chars.substr(Math.floor(Math.random()*chars.length), 1);
+	}
+	return out;
+}
+
+function megafonLkAPILoginNew(options){
+	options = options || {};
+	var prefs = AnyBalance.getPreferences();
+    AnyBalance.setDefaultCharset('utf-8');
+
+    var deviceid = AnyBalance.getData('deviceid');
+    if(!deviceid){
+    	deviceid = randomId();
+    	AnyBalance.setData('deviceid', deviceid);
+    	AnyBalance.saveData();
+    }
+    AnyBalance.trace('Device id: ' + deviceid);
+    g_api_headers['X-MLK-DEVICE-ID'] = deviceid;
+
+	if(!/^\d{10}$/.test(prefs.login))
+		throw new AnyBalance.Error('Пожалуйста, укажите в настройках 10 цифр вашего номера Мегафон, например, 9261234567');
+
+	var token = AnyBalance.getData('token-' + prefs.login);
+	if(token){
+		AnyBalance.trace('Сохранен токен биометрии, входим автоматически');
+		json = callAPI('post', 'auth/biometry', JSON.stringify({captcha: null, msisdn: prefs.login, token: token}), true);
+		if(json.code){
+			AnyBalance.trace(json.message);
+		    AnyBalance.trace('Входим по пину');
+			var pin = AnyBalance.getData('pin-' + prefs.login);
+			json = callAPI('post', 'auth/pin', JSON.stringify({captcha: null, msisdn: prefs.login, pin: pin}), true);
+			if(json.code){
+				AnyBalance.trace(json.message);
+				token = null;
+			}else{
+				json = callAPI('post', 'api/profile/biometry', '{}', true);
+				if(json.token){
+					AnyBalance.trace('Обновляем токен биометрии');
+					AnyBalance.setData('token-' + prefs.login, json.token);
+					AnyBalance.saveData();
+				}
+			}
+		}
+	}
+	if(!token){
+		AnyBalance.trace('Вход по одноразовому паролю. Привязываем устройство');
+		var html = AnyBalance.requestPost(api_url + 'auth/otp/request', {login: prefs.login}, g_api_headers);
+		var json = getJson(html);
+
+		if(!json.ok){
+			AnyBalance.trace(html);
+			throw new AnyBalance.Error(json.message || 'Ошибка входа. Неправильный номер?', null, true);
+		}
+
+		var code = AnyBalance.retrieveCode('Пожалуйста, введите код входа в Личный Кабинет из СМС для привязки номера к устройству', null, {inputType: 'number'});
+
+		html = AnyBalance.requestPost(api_url + 'auth/otp/submit', {login: prefs.login, otp: code}, g_api_headers);
+		json = getJson(html);
+
+		if(json.code){
+			AnyBalance.trace(html);
+			throw new AnyBalance.Error(json.message || 'Неверный код подтверждения');
+		}
+
+		var pin = Math.floor(1000 + Math.random()*9000).toString();
+		json = callAPI('post', 'api/profile/pin', JSON.stringify({captcha: null, pin: pin}));
+		
+		json = callAPI('post', 'api/profile/biometry', '{}');
+		if(!json.token)
+			throw new AnyBalance.Error('Не удалось получить токен биометрии. Сайт изменен?');
+
+		AnyBalance.setData('pin-' + prefs.login, pin);
+		AnyBalance.setData('token-' + prefs.login, json.token);
+		AnyBalance.saveData();
+	}
+}
+
 function megafonLkAPIDo(options, result) {
-    if (AnyBalance.isAvailable('phone', 'balance', 'bonus_balance', 'tariff', 'credit')) {
-        json = callAPI('get', 'api/main/info');
+	var prefs = AnyBalance.getPreferences();
 
-        getParam(json.msisdn, result, 'phone', null, replaceNumber);
-        getParam(json.balance + '', result, 'available', null, replaceTagsAndSpaces, parseBalance);
-        getParam(json.originalBalance + '', result, 'balance', null, replaceTagsAndSpaces, parseBalance);
-        getParam(json.bonusBalance + '', result, 'bonus_balance', null, replaceTagsAndSpaces, parseBalance);
-        getParam((json.balance-json.originalBalance) + '', result, 'credit', null, replaceTagsAndSpaces, parseBalance);
+    if (AnyBalance.isAvailable('phone')) {
+        getParam(prefs.login, result, 'phone', null, replaceNumber);
+    }
+     
+    if (AnyBalance.isAvailable('balance', 'credit', 'available')) {
+        json = callAPI('get', 'api/main/balance');
 
-        if (json.ratePlan)
-            getParam(json.ratePlan.name, result, 'tariff', null, replaceTagsAndSpaces);
+        getParam(json.balanceWithLimit + '', result, 'available', null, replaceTagsAndSpaces, parseBalance);
+        getParam(json.balance + '', result, 'balance', null, replaceTagsAndSpaces, parseBalance);
+        getParam((json.balanceWithLimit - json.balance) + '', result, 'credit', null, replaceTagsAndSpaces, parseBalance);
+    }
+
+    if(AnyBalance.isAvailable('tariff') && !result.tariff){
+    	json = callAPI('get', 'api/tariff/2019-2/current');
+    	getParam(json.name, result, 'tariff', null, replaceTagsAndSpaces);
     }
 
     try{
@@ -197,7 +288,7 @@ function processMonthExpensesApi(result){
 }
 
 function processRemaindersApi(result){
-    if (AnyBalance.isAvailable('remainders')) {
+    if (AnyBalance.isAvailable('remainders') || (AnyBalance.isAvailable('tariff') && !result.tariff)) {
         var json = callAPI('get', 'api/options/remainders');
 
         var remainders = result.remainders = {};
@@ -205,8 +296,17 @@ function processRemaindersApi(result){
         var namesProcessed = [];
         //for(var i = 0; i < json.models.length; i++) {
         // Идем с конца, чтобы игнорировать "замерзшие" остатки
+        if(!json.models){
+        	AnyBalance.trace('Остатков не обнаружено: ' + JSON.stringify(json));
+        	return;
+        }
+        	
         for(var i = json.models.length-1; i >= 0; i--) {
             var model = json.models[i];
+
+            if(model.optionsRemaindersType == 'RATE_PLAN' && !result.tariff)
+            	result.tariff = replaceAll(model.name, replaceTagsAndSpaces);
+
             var optionId = (model.remainders && model.remainders[0] && model.remainders[0].optionId);
 
             // Этот пакет опций мы уже обработали
@@ -239,6 +339,9 @@ function processRemaindersApi(result){
                         }else if((/\.\s*МегаФон|на мегафон|на МФ/i.test(name) && !/МТС/i.test(name) && !/стационар/i.test(name))
                             || /внутри сети/i.test(name)) {
                             sumParam(current.available + units, remainders, 'remainders.mins_net_left', null, replaceTagsAndSpaces, parseMinutes, aggregate_sum);
+						}else if(/Безлимитные входящие/i.test(name)) {
+							AnyBalance.trace('Бесконечное значение минут (' + name + '), пропускаем...');
+							continue;
                         } else {
                             sumParam(current.available + units, remainders, 'remainders.mins_left', null, replaceTagsAndSpaces, parseMinutes, aggregate_sum);
                             sumParam(current.total + units, remainders, 'remainders.mins_total', null, replaceTagsAndSpaces, parseMinutes, aggregate_sum);
@@ -269,6 +372,8 @@ function processRemaindersApi(result){
 								getParam(current.available + current.unit, remainders, 'remainders.internet_roam_europe', null, replaceTagsAndSpaces, parseTraffic);
 						}else if(/Автопродление/i.test(name)) {
 								getParam(current.available + current.unit, remainders, 'remainders.internet_auto_prolong', null, replaceTagsAndSpaces, parseTraffic);
+						}else if(/Интернет в Крыму/i.test(name)) {
+								getParam(current.available + current.unit, remainders, 'remainders.internet_left_crimea', null, replaceTagsAndSpaces, parseTraffic);
                         } else {
                             var suffix = '';
                             if(/ноч/i.test(name)) suffix = '_night';
@@ -279,7 +384,7 @@ function processRemaindersApi(result){
                             var internet_total = getParam(current.total + current.unit, null, null, null, replaceTagsAndSpaces, parseTraffic);
                             
 							if(!unlim)
-								unlim = (internet_total >= 5000000); //Больше 5000 ТБ это же явно безлимит
+								unlim = (internet_total >= 999000); //Больше 999 ГБ это же явно безлимит
 							if(unlim)
 								AnyBalance.trace('пропускаем безлимит трафика: ' + name + ' ' + (current.available + current.unit) + '/' + (current.total + current.unit));
                             

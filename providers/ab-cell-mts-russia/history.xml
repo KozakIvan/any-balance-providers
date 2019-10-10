@@ -1,5 +1,75 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <history>
+	<change major_version="4.1" version="185" date="2019-09-03">
+	- Улучшена обработка ошибок.
+	</change>
+	<change major_version="4.1" version="184" date="2019-07-26">
+	Исправлена капча
+	</change>
+	<change major_version="4.1" version="183" date="2019-07-25">
+	Обновление через мобильный интернет
+	</change>
+	<change major_version="4.1" version="182" date="2019-06-22">
+	Округление баланса до копеек
+	</change>
+	<change major_version="4.1" version="181" date="2019-06-22">
+	Исправлена проблема со входом из-за старых кук
+	</change>
+	<change major_version="4.1" version="180" date="2019-06-22">
+	Исправление процедуры входа
+	</change>
+	<change major_version="4.1" version="179" date="2019-06-22">
+	Поддержка нового ЛК
+	</change>
+	<change major_version="4.1" version="178" date="2019-04-22">
+	Поддержка изменений в процедуре входа через моб. интернет
+	</change>
+	<change major_version="4.1" version="177" date="2019-03-10">
+	Исправлен вход в случае капчи
+	</change>
+	<change major_version="4.1" version="176" date="2019-01-11">
+	Исправлено получения трафика в некоторых случаях
+	</change>
+	<change major_version="4.1" version="175" date="2018-12-28">
+	- Исправлен показ капчи в случае необходимости
+	</change>
+	<change major_version="4.1" version="174" date="2018-10-09">
+	Частично восстановлено получение информации для номеров МГТС (трафик пока не восстановлен!)
+	</change>
+	<change major_version="4.1" version="173" date="2018-10-04">
+	Улучшено распознавание минут
+	</change>
+	<change major_version="4.1" version="172" date="2018-09-28">
+	- Поддержка изменений на сайте.
+	</change>
+	<change major_version="4.1" version="171" date="2018-09-21">
+	- Поддержка изменений на сайте.
+	</change>
+	<change major_version="4.1" version="170" date="2018-09-17">
+	Исправлен вход через мобильный интернет в некоторых случаях
+	</change>
+	<change major_version="4.1" version="169" date="2018-05-22">
+	МТС ввело рекапчу :(
+	Сброс сессии и запрос капчи, если с сохраненной сессией не пускает в кабинет
+	</change>
+	<change major_version="4.1" version="168" date="2018-05-22">
+	МТС стало требовать рекапчу...
+	</change>
+	<change major_version="4.1" version="167" date="2018-05-11">
+	- Исправлено получение трафика из интернет-кабинета
+	</change>
+	<change major_version="4.1" version="166" date="2018-05-11">
+	- Поддержка изменений в процедуре входа
+	</change>
+	<change major_version="4.1" version="165" date="2017-11-21">
+	Исправление получения баланса для андроида &lt; 4.1
+	</change>
+	<change major_version="4.1" version="164" date="2017-11-15">
+	Поддержка работы на андроид 4
+	</change>
+	<change major_version="4.1" version="163" date="2017-09-20">
+	Отключение надоедливого СМС о входе в кабинет
+	</change>
 	<change major_version="4.1" version="162" date="2017-07-24">
 	Исправление получения трафика в некоторых случаях
 	</change>

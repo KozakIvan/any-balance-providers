@@ -314,12 +314,13 @@ function processCard(html, result){
 	getParam(html, result, 'cards.currency', /<span[^>]+amountBox[^>]*>([\s\S]*?)<\/span>/i, replaceTagsAndSpaces, parseCurrency);
 	getParam(html, result, 'cards.name', /<div[^>]+aliasBox[^>]*>([\s\S]*?)<\/div>/i, replaceTagsAndSpaces);
 
-	if(AnyBalance.isAvailable('cards.debt_late', 'cards.minpay', 'cards.debt', 'cards.gracepay', 'cards.gracepay_till', 'cards.limit', 'cards.blocked', 'cards.sms', 'cards.till', 'cards.transactions')){
+	if(AnyBalance.isAvailable('cards.debt_late', 'cards.minpay', 'cards.minpay_till', 'cards.debt', 'cards.gracepay', 'cards.gracepay_till', 'cards.limit', 'cards.blocked', 'cards.sms', 'cards.till', 'cards.transactions')){
 		html = AnyBalance.requestGet(g_baseurl + '/scoring/protected/statement/card/' + result.__id, g_headers);
 		var table = getElement(html, /<table[^>]+bigCardShadow[^>]*>/i, replaceHtmlEntities);
 
 		getParam(table, result, 'cards.debt_late', /Просроченная задолженность:[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i, replaceTagsAndSpaces, parseBalance);
         getParam(table, result, 'cards.minpay', /Минимальный платеж:[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i, replaceTagsAndSpaces, parseBalance);
+        getParam(table, result, 'cards.minpay_till', /погасить до:[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i, replaceTagsAndSpaces, parseDate);
         getParam(table, result, 'cards.debt', /Всего задолженность:[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i, replaceTagsAndSpaces, parseBalance);
         getParam(table, result, 'cards.date_start', /Дата открытия карты:([^<]*)/i, replaceTagsAndSpaces, parseDate);
         getParam(table, result, 'cards.pct', /Процентная ставка:([^<]*)/i, replaceTagsAndSpaces, parseBalance);
@@ -437,8 +438,8 @@ function processCredit(html, result){
 
     //Ежемесячный платеж:
     getParam(html, result, 'credits.minpay', /&#1045;&#1078;&#1077;&#1084;&#1077;&#1089;&#1103;&#1095;&#1085;&#1099;&#1081; &#1087;&#1083;&#1072;&#1090;&#1077;&#1078;:[\s\S]*?<span[^>]+amountBox[^>]*>([\s\S]*?)<\/span>/i, replaceTagsAndSpaces, parseBalance);
-    //Дата списания:
-    getParam(html, result, 'credits.minpay_till', /&#1044;&#1072;&#1090;&#1072; &#1089;&#1087;&#1080;&#1089;&#1072;&#1085;&#1080;&#1103;:([^<]*)/i, replaceTagsAndSpaces, parseDate);
+    //Дата платежа
+    getParam(html, result, 'credits.minpay_till', /&#1044;&#1072;&#1090;&#1072; &#1087;&#1083;&#1072;&#1090;&#1077;&#1078;&#1072;([^<]*)/i, replaceTagsAndSpaces, parseDate);
 
     if(AnyBalance.isAvailable('credits.debt_late', 'credits.pct', 'credits.date_start', 'credits.period', 'credits.cardnum', 'credits.accnum')){
         html = AnyBalance.requestGet(g_baseurl + '/scoring/protected/statement/credit/' + result.__id, g_headers);

@@ -17,6 +17,7 @@ var g_countersTable = {
 		"type": "cards.type",
 		"sms": "cards.sms",
 		"minpay": "cards.minpay",
+		"minpay_till": "cards.minpay_till",
 		"limit": "cards.limit",
 		"gracepay": "cards.gracepay",
 		"gracepay_till": "cards.gracepay_till",
@@ -95,6 +96,10 @@ function shouldProcess(counter, info){
 function main(){
 	var prefs = AnyBalance.getPreferences();
 
+	AnyBalance.setOptions({
+		SSL_ENABLED_PROTOCOLS: ['TLSv1.1', 'TLSv1.2'] 
+	});
+	
     if(!/^(card|crd|dep|acc)$/i.test(prefs.type || ''))
     	prefs.type = 'card';
 

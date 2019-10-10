@@ -14,7 +14,7 @@ var g_gwtCfg = {
 	url: 'https://account.kyivstar.ua/cas/auth/',
 	strong_name: '\\b%VARNAME_BROWSER%],(\\w+)\\)',
 	auth_nocache: 'auth.nocache.js',
-	magic_id: 'A5FD77FC44B7450D13B59BA51234C41C'
+	magic_id: '2DBCE67F6E14FC6EA6EDAFE3ABA12BD9'
 };
 
 function isLoggedIn(html) {
@@ -52,9 +52,9 @@ function initializeLogin() {
 		'Введите номер вашего телефона для входа в Мой Киевстар (в формате +380ХХХХХХХХХ), например +380971234567');
 	checkEmpty(prefs.password, 'Введите пароль!');
 
-	AnyBalance.setOptions({
-		SSL_ENABLED_PROTOCOLS: ['TLSv1'] // https://my.kyivstar.ua очень смущается от присутствия TLSv1.1 и TLSv1.2
-	});
+//	AnyBalance.setOptions({
+//		SSL_ENABLED_PROTOCOLS: ['TLSv1'] // https://my.kyivstar.ua очень смущается от присутствия TLSv1.1 и TLSv1.2
+//	});
 }
 
 function isThereLoginForm(html){

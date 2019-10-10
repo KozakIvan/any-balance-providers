@@ -23,9 +23,15 @@ function main() {
 	var result = {success: true};
 
 	if(AnyBalance.isAvailable('rate', 'rate_btc', 'usd', 'btc')){
+		var cf = Cloudflare(baseurl);
 		var html = AnyBalance.requestGet(baseurl, g_headers);
-		getParam(html, result, ['rate', 'usd'], /\$([\d\.\s]*)@[^<]*BTC\/ETH/i, replaceTagsAndSpaces, parseBalance);
-		getParam(html, result, ['rate_btc', 'btc'], /@([^<]*)BTC\/ETH/i, replaceTagsAndSpaces, parseBalance);
+		if(cf.isCloudflared(html))
+		    html = cf.executeScript(html);
+
+		var price = getElement(html, /<a[^>]+View Historical Ether Price/i, replaceTagsAndSpaces);
+
+		getParam(price, result, ['rate', 'usd'], /\$([\d\.,\s]*)/i, replaceTagsAndSpaces, parseBalance);
+		getParam(price, result, ['rate_btc', 'btc'], /@([^<]*)/i, replaceTagsAndSpaces, parseBalance);
 	}
 
 	if(AnyBalance.isAvailable('balance', 'usd', 'btc')){

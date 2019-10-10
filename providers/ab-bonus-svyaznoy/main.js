@@ -14,6 +14,8 @@ var g_headers = {
 
 function main() {
   var prefs = AnyBalance.getPreferences();
+  var baseurlAuth = 'https://oauth.sclub.ru/';
+  var baseurlApi = 'https://api.sclub.ru/';
   var baseurl = 'https://sclub.ru/';
   AnyBalance.setDefaultCharset('utf-8');
 
@@ -23,12 +25,11 @@ function main() {
 
   var html = AnyBalance.requestGet(baseurl, g_headers);
 
-  var res = AnyBalance.requestPost(baseurl + 'oauth/connect/token', {
+  var res = AnyBalance.requestPost(baseurlAuth + 'connect/token', {
     grant_type: 'password',
     username: prefs.login,
     password: prefs.password,
-    client_id: '1',
-    scope: 'read:cur_user write:cur_user write:cur_user_email cur_user_books offline_access payment:domru'
+    client_id: '1'
   }, addHeaders({
     Referer: baseurl
   }));
@@ -38,12 +39,11 @@ function main() {
   if(/recaptcha/i.test(json.message)){
   	AnyBalance.trace('Потребовалась рекапча...');
   	var recaptcha = solveRecaptcha('Пожалуйста, докажите, что вы не робот!', baseurl, '6LdBYQITAAAAAJ-XHv2zQovsH44LC_Eef-KVH1GT');
-  	res = AnyBalance.requestPost(baseurl + 'oauth/connect/token', {
+  	res = AnyBalance.requestPost(baseurlAuth + 'connect/token', {
     	grant_type: 'password',
     	username: prefs.login,
     	password: prefs.password,
-    	client_id: '1',
-    	scope: 'read:cur_user write:cur_user write:cur_user_email cur_user_books public offline_access payment'
+    	client_id: '1'
   	}, addHeaders({
   		'recaptcha-code': recaptcha,
     	Referer: baseurl
@@ -61,7 +61,7 @@ function main() {
 
   var token = json.access_token;
 
-  res = AnyBalance.requestGet(baseurl + 'api/user', addHeaders({
+  res = AnyBalance.requestGet(baseurlApi + 'identity/user', addHeaders({
     Referer: baseurl,
     Authorization: 'Bearer ' + token
   }));
@@ -71,10 +71,18 @@ function main() {
   var result = {
     success: true
   };
-  var card = json.cards[0];
+  var cardNo = json.cards[0];
+  if(!cardNo)
+  	  throw new AnyBalance.Error('У вас нет ни одной бонусной карты');
+
+  html = AnyBalance.requestGet(baseurlApi + 'cards/' + cardNo, addHeaders({
+  	  Referer: baseurl,
+      Authorization: 'Bearer ' + token
+  }));
+  var card = getJson(html);
 
   AB.getParam(json.nickName + '', result, 'customer', null, AB.replaceTagsAndSpaces);
-  AB.getParam(json.pluses + '', result, 'balanceinpoints', null, AB.replaceTagsAndSpaces, AB.parseBalance);
+  AB.getParam(card.pluses + '', result, 'balanceinpoints', null, AB.replaceTagsAndSpaces, AB.parseBalance);
   AB.getParam(card && card.balance/100, result, 'balanceinrubles', null, AB.replaceTagsAndSpaces, AB.parseBalance);
   AB.getParam(card && card.ean, result, 'cardnumber');
   AB.getParam(card && card.status, result, 'cardstate');
@@ -82,7 +90,7 @@ function main() {
   AB.getParam(card && card.planExpires, result, 'till', null, null, parseDateISO);
 
   if (card && AnyBalance.isAvailable(['pointsinlastoper', 'lastoperationplace', 'lastoperationdate'])) {
-    res = AnyBalance.requestGet(baseurl + 'api/user/cards/' + card.ean + '/operations?orderByDateAsc=false&skip=0&take=10&type=', addHeaders({
+    res = AnyBalance.requestGet(baseurlApi + 'cards/' + card.ean + '/operations?page=1&pageSize=20', addHeaders({
       Referer: baseurl,
       Authorization: 'Bearer ' + token
     }));
@@ -93,8 +101,18 @@ function main() {
       var lastOperation = json.data[0];
 
       AB.getParam(lastOperation.amount + '', result, 'pointsinlastoper', null, AB.replaceTagsAndSpaces, AB.parseBalance);
-      AB.getParam(lastOperation.brandName + '', result, 'lastoperationplace', null, AB.replaceTagsAndSpaces);
       AB.getParam(lastOperation.operationDate + '', result, 'lastoperationdate', null, AB.replaceTagsAndSpaces, AB.parseDateISO);
+
+      if(AnyBalance.isAvailable('lastoperationplace') && lastOperation.partnerStoreId){
+    		res = AnyBalance.requestGet(baseurlApi + 'content/stores/?ids=' + lastOperation.partnerStoreId, addHeaders({
+      			Referer: baseurl,
+		        Authorization: 'Bearer ' + token
+		    }));
+    		json = getJson(res);
+
+            AB.getParam(json[0] && json[0].brandName, result, 'lastoperationplace', null, AB.replaceTagsAndSpaces);
+      }
+
     }
   }
 

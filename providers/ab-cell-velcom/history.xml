@@ -1,5 +1,29 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <history>
+	<change version="64" date="2019-08-12">
+	Переезд на a1
+	</change>
+	<change version="63" date="2018-10-04">
+	Разрешено вводить буквы в пароле
+	</change>
+	<change version="62" date="2018-10-04">
+	- Поддержка изменений на сайте.
+	</change>
+	<change version="61" date="2018-07-05">
+	Исправлено получение трафика
+	</change>
+	<change version="60" date="2017-11-15">
+	Поддержка изменений в процедуре входа
+	</change>
+	<change version="59" date="2017-08-26">
+	- Поддержка изменений на сайте.
+	</change>
+	<change version="58" date="2017-08-11">
+	- Поддержка изменений на сайте.
+	</change>
+	<change version="57" date="2017-08-11">
+	- Поддержка изменений в процедуре входа
+	</change>
 	<change version="56" date="2017-05-12">
 	Поддержка нового адреса личного кабинета
 	</change>

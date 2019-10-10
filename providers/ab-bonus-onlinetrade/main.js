@@ -18,24 +18,47 @@ function main() {
 	AB.checkEmpty(prefs.login, 'Введите логин!');
 	AB.checkEmpty(prefs.password, 'Введите пароль!');
 	
-	AnyBalance.setCookie('www.onlinetrade.ru', 'beget', 'begetok');
-	
 	var html = AnyBalance.requestGet(baseurl + 'member/login.html', g_headers);
+	var cE = getParam(html, /var\s+cE\s*=\s*['"]([^"']*)/);
+	if(cE){
+		AnyBalance.trace('Fooling stormwall');
+		var cK = getParam(html, /var\s+cK\s*=\s*(\d+)/, null, parseBalance);
+		var cookie = generateCookieValue(cK, cE);
+		AnyBalance.trace('swp_token: ' + cookie);
+		AnyBalance.setCookie('www.onlinetrade.ru', 'swp_token', cookie);
+	}
+	
+	html = AnyBalance.requestGet(baseurl + 'member/login.html', g_headers);
 	
 	if(!html || AnyBalance.getLastStatusCode() > 400){
 		AnyBalance.trace(html);
 		throw new AnyBalance.Error('Ошибка при подключении к сайту провайдера! Попробуйте обновить данные позже.');
 	}
 
-	html = AnyBalance.requestPost(baseurl + 'member/login.html', {
-		login: prefs.login,
-		password: prefs.password,
-		'log_in': '1',
-		'submit': 'войти'
-	}, addHeaders({Referer: baseurl + 'member/login.html'}));
+	var form = getElements(html, [/<form/ig, /password/i])[0];
+	if(!form){
+		AnyBalance.trace(html);
+		throw new AnyBalance.Error('Не удалось найти форму входа. Сайт изменен?');
+	}
+
+	var params = AB.createFormParams(form, function(params, str, name, value) {
+		if (name == 'login') {
+			return prefs.login;
+		} else if (name == 'password') {
+			return prefs.password;
+		} else if (name == 'captcha') {
+			var img = AnyBalance.requestGet(baseurl + 'captcha.php?mode=login', addHeaders({Referer: baseurl + 'member/login.html'}));
+			return AnyBalance.retrieveCode('Пожалуйста, введите цифры с картинки', img, { inputType: 'number' });
+		}
+
+		return value;
+	});
 	
-	if (!/member\/\?log_out=1/i.test(html)) {
-		var error = AB.getParam(html, null, null, /MessageError[^>]*>([\s\S]*?)<\/div>/i, AB.replaceTagsAndSpaces);
+	
+	html = AnyBalance.requestPost(baseurl + 'member/login.html', params, addHeaders({Referer: baseurl + 'member/login.html'}));
+	
+	if (!/memberEntered/i.test(html)) {
+		var error = AB.getElement(html, /<[^>]+coloredMessage_red/i, AB.replaceTagsAndSpaces);
 		if (error)
 			throw new AnyBalance.Error(error, null, /неверный/i.test(error));
 		
@@ -45,11 +68,11 @@ function main() {
 	
 	var result = {success: true};
 	
-	AB.getParam(html, result, 'balance', /ON-бонусов:([^>]+>){2}/i, AB.replaceTagsAndSpaces, AB.parseBalance);
-	AB.getParam(html, result, 'price', /Цена:([^>]+>){2}/i, AB.replaceTagsAndSpaces);
-	AB.getParam(html, result, 'userId', /Клиентский номер([^>]+>){2}/i, AB.replaceTagsAndSpaces);
-	AB.getParam(html, result, 'status', /Статус:([^>]+>){2}/i, AB.replaceTagsAndSpaces);
-	AB.getParam(html, result, 'email', /E-mail:([^>]+>){2}/i, AB.replaceTagsAndSpaces);
+	AB.getParam(html, result, 'balance', /ON-бонусов:([^>]+)/i, AB.replaceTagsAndSpaces, AB.parseBalance);
+	//AB.getParam(html, result, 'price', /Цена:([^>]+>){2}/i, AB.replaceTagsAndSpaces);
+	AB.getParam(html, result, 'userId', /Клиентский номер[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i, AB.replaceTagsAndSpaces);
+	AB.getParam(html, result, 'status', /Статус:[\s\S]*?<span[^>]*>([\s\S]*?)(?:<a|<\/span)/i, AB.replaceTagsAndSpaces);
+	AB.getParam(html, result, 'email', /E-mail:[\s\S]*?<span[^>]*>([\s\S]*?)(?:<a|<\/span)/i, AB.replaceTagsAndSpaces);
 	
 	AnyBalance.setResult(result);
 }

@@ -36,6 +36,7 @@ function main() {
 			throw e;
 		//Обломался сайт. Если можно мобильное приложение, давайте его попробуем
 		AnyBalance.trace('Не получается зайти в личный кабинет: ' + e.message + ', ' + e.stack + '. Попробуем мобильное приложение');
+		clearAllCookies();
 		proceedWithMobileAppAPI(baseurl);
 		return;
 	}
@@ -79,6 +80,9 @@ var g_countersTable = {
 		"min_local_till": "remainders.min_local_till",
 		"services_abon": "services_abon",
 		"services_count": "services_count",
+		"last_pay_date": "payments.date",
+		"last_pay_sum": "payments.sum",
+		"last_pay_place": "payments.place",
 		"__tariff": "tariff"
 	}
 };

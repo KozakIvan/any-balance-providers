@@ -17,6 +17,15 @@ var g_ServiceStatus = {
 
 var baseurl = "https://lk.rt.ru/";
 
+var g_web_headers = {
+	Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+	'Accept-Charset': 'windows-1251,utf-8;q=0.7,*;q=0.3',
+	'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4',
+	Connection: 'keep-alive',
+	'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+    Referer:baseurl
+};
+
 var g_headers = {
 	Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 	'Accept-Charset': 'windows-1251,utf-8;q=0.7,*;q=0.3',
@@ -122,38 +131,79 @@ function main(){
     }else{
     	AnyBalance.trace('Входить будем по логину');
     }
+/*
+    //Get captcha
+    var sitekey = '6LeQM84SAAAAAKALDOQ_0oUk2i09ozbCzrWg4nt5';
+    var html = AnyBalance.requestGet('https://www.google.com/recaptcha/api/challenge?k=' + sitekey + '&ajax=1&cachestop=' + Math.random(), addHeaders({
+    	Referer: baseurl
+    }));
+    var challenge = getParam(html, /challenge\s*:\s*'([^']*)/);
+    html = AnyBalance.requestGet('https://www.google.com/recaptcha/api/reload?c=' + challenge + '&k=' + sitekey + '&reason=i&type=image&lang=ru', addHeaders({
+    	Referer: baseurl
+    }));
+    var imgid = getParam(html, /Recaptcha.finish_reload\(\'([^']*)/);
+    var img = AnyBalance.requestGet('https://www.google.com/recaptcha/api/image?c=' + imgid, addHeaders({
+    	Referer: baseurl
+    }));
 
-    var uuid = generateUUID();
-    var html = AnyBalance.requestPost(baseurl + 'client-api/login', JSON.stringify({
-    	"login": login,
-    	"loginType": type,
-    	"passwd": prefs.password,
-    	"remember":false,
-    	"client_uuid":generateUUID(),
-    	"currnet_page":"login",
-//    	"current_page":"login"
-    }), g_headers);
+    var code = AnyBalance.retrieveCode('Пожалуйста, введите слова с картинки', img);
+*/
+	var html = AnyBalance.requestPost(baseurl + 'client-api/checkSession', JSON.stringify({
+		client_uuid: generateUUID(), 
+		current_page: ''
+	}), addHeaders({Referer: baseurl}));
+
+
+    var state = generateUUID();
+    html = AnyBalance.requestGet('https://b2c.passport.rt.ru/auth/realms/b2c/protocol/openid-connect/auth?' + createUrlEncodedParams({
+    	response_type: 'code',
+    	scope: 'openid',
+    	client_id: 'lk_b2c',
+    	state: state,
+    	redirect_uri: 'https://lk.rt.ru/sso-auth/?redirect=https%3A%2F%2Flk.rt.ru%2F'
+    }), g_web_headers);
 
 	if(/Личный кабинет временно недоступен/i.test(html)) {
 		throw new AnyBalance.Error('Личный кабинет временно недоступен. Ведутся технические работы, попробуйте обновить баланс позже.');
 	}
 
-    var json = getJson(html);
-    if(json.isError)
-        throw new AnyBalance.Error(json.errorMessage, null, /парол/.test(json.errorMessage));
-//    if(!json.sessionKey)
-//        throw new AnyBalance.Error("Не удалось получить идентификатор сессии!");
+    var form = getElement(html, /<form[^>]+kc-form-login/i);
+    if(!form){
+    	AnyBalance.trace(html);
+    	throw new AnyBalance.Error('Не удалось найти форму входа. Сайт изменен?');
+    }
 
-//    var domain = getParam(baseurl, null, null, /https?:\/\/([^\/]*)/i);
-//    AnyBalance.setCookie(domain, 'sessionHashKey', json.sessionKey);
+    var action = getParam(form, /<form[^>]+action="([^"]*)/i, replaceHtmlEntities);
+	var params = AB.createFormParams(form, function(params, str, name, value) {
+		if (name == 'username') {
+			return prefs.login;
+		} else if (name == 'password') {
+			return prefs.password;
+		}
 
-//    html = AnyBalance.requestGet(baseurl, g_headers);
+		return value;
+	});
+
+	var html = AnyBalance.requestPost(action, params, addHeaders({Referer: AnyBalance.getLastUrl()}, g_web_headers));
+
+	if(AnyBalance.getLastUrl().indexOf(baseurl) != 0){
+		var error = getElement(html, /<div[^>]+error/i, replaceTagsAndSpaces);
+		if(error)
+			throw new AnyBalance.Error(error, null, /парол/i.test(error));
+		AnyBalance.trace(html);
+		throw new AnyBalance.Error('Не удалось войти в личный кабинет. Сайт изменен?');
+	}
+
+	html = AnyBalance.requestPost(baseurl + 'client-api/checkSession', JSON.stringify({
+		client_uuid: generateUUID(), 
+		current_page: ''
+	}), addHeaders({Referer: baseurl}));
 
 	html = AnyBalance.requestPost(baseurl + 'client-api/getAccounts', JSON.stringify({
-		client_uuid: uuid,
-		currnet_page: 'login'
-	}), g_headers);
-
+		client_uuid: generateUUID(),
+		current_page: 'login'
+	}), addHeaders({Referer: baseurl}));
+    
     var accinfo = getRTJson(html);
 
     if(!accinfo.accounts || accinfo.accounts.length == 0)
@@ -219,8 +269,8 @@ function main(){
 
 			html = AnyBalance.requestPost(baseurl + 'client-api/getServiceTariffName', JSON.stringify({
 				servicesId: servicesIds,
-				client_uuid: uuid,
-				currnet_page: 'main'
+				client_uuid: generateUUID(),
+				current_page: 'main'
 			}), g_headers);
 			acc.__tariffNames = getRTJson(html).tariffNames;
 
@@ -228,8 +278,8 @@ function main(){
 			try{
 				html = AnyBalance.requestPost(baseurl + 'client-api/getAccountBalance', JSON.stringify({
 					accountId: acc.accountId,
-					client_uuid: uuid,
-					currnet_page: 'main'
+					client_uuid: generateUUID(),
+					current_page: 'main'
 				}), g_headers);
 
 				acc.__detailedInfo = getRTJson(html);;
@@ -249,8 +299,8 @@ function main(){
 
 						html = AnyBalance.requestPost(baseurl + 'client-api/getServiceInfo', JSON.stringify({
 							serviceId: service.serviceId,
-							client_uuid: uuid,
-							currnet_page: 'main'
+							client_uuid: generateUUID(),
+							current_page: 'main'
 						}), g_headers);
 
 						statuses.push(g_ServiceStatus[getRTJson(html).status]);
@@ -277,8 +327,8 @@ function main(){
 						if(AnyBalance.isAvailable('sms' + suffix, 'mms' + suffix, 'min' + suffix, 'gprs' + suffix)){
 							var jsonPackets = getJson(AnyBalance.requestPost(baseurl + 'client-api/getServiceTariff', JSON.stringify({
 								serviceId: service.serviceId,
-								client_uuid: uuid,
-								currnet_page: 'mvno'
+								client_uuid: generateUUID(),
+								current_page: 'mvno'
 							}), g_headers));
 
 							if(jsonPackets.options){
@@ -383,16 +433,12 @@ function main(){
     if(AnyBalance.isAvailable('bonusFPL')){
 		AnyBalance.trace('Пробуем найти программу "Бонус"...');
 		try {
-			html = AnyBalance.requestPost(baseurl + 'client-api/getBonusStatus', JSON.stringify({
-				client_uuid: uuid,
-				currnet_page: 'main'
+			html = AnyBalance.requestPost(baseurl + 'client-api/getFplStatus', JSON.stringify({
+				client_uuid: generateUUID(),
+				current_page: ''
 			}), g_headers);
 			var jsonBonus = getRTJson(html);
-			if(jsonBonus.bonus){
-				getParam(jsonBonus.bonus.points, result, 'bonusFPL');
-			}else{
-				AnyBalance.trace('Нет программы Бонус: ' + html);
-			}
+			getParam(jsonBonus.balance, result, 'bonusFPL');
 		} catch (e) {
 			AnyBalance.trace('Не удалось получить программу "Бонус": ' + e.message);
 		}
@@ -407,8 +453,8 @@ function main(){
 				try{
 					html = AnyBalance.requestPost(baseurl + 'client-api/getAccountBalance', JSON.stringify({
 						accountId: acc.accountId,
-						client_uuid: uuid,
-						currnet_page: 'main'
+						client_uuid: generateUUID(),
+						current_page: 'main'
 					}), g_headers);
 					json = getRTJson(html);
 					var balance = getAccBalance(json);

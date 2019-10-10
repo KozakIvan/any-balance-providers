@@ -3,34 +3,141 @@
 */
 
 var g_headers = {
-	'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20100101 Firefox/23.0',
-	'Accept':'*/*',
-	'Accept-Language':'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-	//'Accept-Encoding':'gzip, deflate', // Сайт отвечает ошибкой 403 при успешной авторизации, и поэтому надо убрать gzip
-	'Accept-Encoding':null,
-	'Content-Type':'application/json; charset=utf-8',
-	'X-Requested-With':'XMLHttpRequest',
-	'Connection':'keep-alive',
-	'Pragma':'no-cache',
-	'Cache-Control':'no-cache',
+    'Connection': 'keep-alive',
+    'User-Agent': 'Payoneer/5.0 (XT1092; Android 6.0)',
+    'Accept-Charset': 'UTF-8',
+    'X-PX-AUTHORIZATION': '2',
 };
 
 function main(){
     var prefs = AnyBalance.getPreferences();
     var baseurl = 'https://myaccount.payoneer.com/';
-    AnyBalance.setDefaultCharset('utf-8'); 
-	
-	var html = AnyBalance.requestGet(baseurl + 'login/login.aspx', g_headers); 
-    html = AnyBalance.requestPost(baseurl + 'Login/Login.aspx/WmLogin', '{"username":"'+prefs.login+'","password":"'+prefs.password+'","captchaText":"","year":"","month":"","day":"","id":"","cardHolderIdOrg":"; __utma=","PayoneerInternalId":"","userPrefs":""}', addHeaders({Referer: baseurl + 'login/login.aspx'})); 
-	html = AnyBalance.requestGet(baseurl + 'MainPage/PromoPage.aspx', g_headers); 
-	
-    if(!/SetAccount.aspx\?ac=0/i.test(html)){
-        throw new AnyBalance.Error('Не удалось зайти в личный кабинет. Сайт изменен?');
+    var apiUrl = 'https://loginapi.payoneer.com/';
+    AnyBalance.setDefaultCharset('utf-8');
+
+    AB.checkEmpty(prefs.login, 'Введите логин!');
+    AB.checkEmpty(prefs.password, 'Введите пароль!');
+
+    var deviceId = getDeviceId();
+
+    // Массив с сообщениями
+    var res = AnyBalance.requestGet(apiUrl + 'api/v1/assets?locale=en', AB.addHeaders({
+        'Accept': 'application/json',
+    }));
+    var messages = JSON.parse(res);
+
+    AnyBalance.trace('Регистрируем устройство');
+    AnyBalance.requestPost(apiUrl + 'api/v1/devices', JSON.stringify({
+        "DeviceId": deviceId,
+        "DeviceName": "XT1092",
+        "DeviceInfo": {
+            "DeviceType": "XT1092",
+            "OSType": 1,
+            "OSVersion": "6.0",
+            "DeviceLanguage": "ru-RU",
+            "DeviceTime": (new Date()).toISOString(),
+            "DeviceCategory": 2,
+            "AppVersion": "5.0"
+        }
+    }), AB.addHeaders({
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }));
+
+    res = AnyBalance.requestPost(apiUrl + 'api/v1/mobile/login', JSON.stringify({
+        "Username": prefs.login,
+        "Password": prefs.password,
+        "DeviceId": deviceId,
+        "DeviceName": "XT1092",
+        "DeviceInfo": {
+            "DeviceType": "XT1092",
+            "OSType": 1,
+            "OSVersion": "6.0",
+            "DeviceLanguage": "ru-RU",
+            "DeviceTime": (new Date()).toISOString(),
+            "DeviceCategory": 2,
+            "AppVersion": "5.0"
+        }
+    }), AB.addHeaders({
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }));
+    var json = JSON.parse(res);
+
+    if (json.NeedToChangePassword) {
+        AnyBalance.trace('Payoneer просит сменить пароль');
+        throw new AnyBalance.Error('Payoneer просит сменить пароль. Пожалуйста, зайдите в личный кабинет через браузер и смените пароль.', null, true);
     }
-	
+
+    if (json.Errors) {
+        var errors = [],
+            fatal = false;
+        for (var field in json.Errors) {
+            var errorName = json.Errors[field];
+            if (errorName.indexOf('Username.') === 0 || errorName.indexOf('WrongDetails') !== -1) {
+                fatal = true;
+            }
+            if (errorName in messages.resources) {
+                errors.push(messages.resources[errorName]);
+            } else {
+                errors.push(field+': '+errorName);
+            }
+        }
+
+        if (errors.length) {
+            throw new AnyBalance.Error(errors.join('; '), null, fatal);
+        } else {
+            throw new AnyBalance.Error('Проблемы на стороне сайта: неизвестная ошибка, попробуйте ещё раз.', null, fatal);
+        }
+    }
+
+    AnyBalance.trace('Авторизация пройдена');
+
+    res = AnyBalance.requestGet(baseurl + 'gw-balance/API/Balances', AB.addHeaders({
+        'Authorization': 'Bearer '+json.TokenInfo.AccessToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }));
+    json = JSON.parse(res);
+
+    var balance = null;
+    for (var i in json) {
+        var item = json[i];
+        if (item.Status === 1 && item.BalanceType === 2) {
+            balance = item;
+            break;
+        }
+    }
+
+    if (!balance) {
+        throw new AnyBalance.Error('Не удалось найти активные балансы.');
+    }
+
     var result = {success: true};
-    getParam(html, result, '__tariff', /id="ctl00_ddlAccounts"[\s\S]*?>([\s\S]*?)<\//i, replaceTagsAndSpaces, html_entity_decode);
-    getParam(html, result, 'balance', /BalanceTableCell[\s\S]*?<strong>([\s\S]*?)<\//i, null, parseBalance);
-	
+    getParam(item.MaskedCardnumber, result, '__tariff', null, replaceTagsAndSpaces);
+    getParam(item.Balance, result, 'balance', null, null, parseBalance);
+
     AnyBalance.setResult(result);
+}
+
+function getDeviceId() {
+    var g_device_id;
+    if (!g_device_id) {
+        g_device_id = AnyBalance.getData('device_id');
+    }
+
+    if (!g_device_id) {
+        var allowedChars = 'abcdef1234567890';
+        var result = "";
+
+        for(var i=0; i<16; ++i) {
+            result += allowedChars.charAt(Math.floor(Math.random() * allowedChars.length));
+        }
+
+        g_device_id = result;
+        AnyBalance.setData('device_id', result);
+        AnyBalance.saveData();
+    }
+
+    return g_device_id;
 }

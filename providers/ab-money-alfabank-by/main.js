@@ -1,13 +1,15 @@
-﻿/**
+/**
 Провайдер AnyBalance (http://any-balance-providers.googlecode.com)
 */
 
 var g_headers = {
-	'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+	'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
 	'Accept-Charset': 'windows-1251,utf-8;q=0.7,*;q=0.3',
 	'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4',
 	'Connection': 'keep-alive',
-	'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.76 Safari/537.36',
+	'Origin': 'https://click.alfa-bank.by',
+	'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36',
+	'Referer': "https://click.alfa-bank.by/",
 };
 
 var baseurl = 'https://click.alfa-bank.by/';
@@ -15,7 +17,14 @@ function login(){
 }
 
 function isLoggedIn(html){
-	return /Выход/i.test(html);
+	return /Выход[^a-я]/i.test(html);
+}
+
+function skipButtons(params, str, name, value) {
+	if (/^<button/i.test(str)) //Skip buttons
+		return;
+
+	return value;
 }
 
 function followLink(html, reName){
@@ -33,7 +42,8 @@ function followLink(html, reName){
 		AnyBalance.trace(html);
 		throw new AnyBalance.Error('Не удалось найти форму перехода по ссылке ' + reName.source);
 	}
-	var params = createFormParams(form);
+	var params = createFormParams(form, skipButtons);
+
 	for(var i in addParams)
 		params[i] = addParams[i];
 
@@ -53,23 +63,23 @@ function followAjaxLink(html, reName, linkSearchHtml){
 		throw new AnyBalance.Error('Не удалось найти ajax ссылку ' + reName.source);
 	}
 
-	var ajaxParams = getJsonObject(a, /PrimeFaces.ab\s*\(\s*/);
-	var formName = ajaxParams.source.replace(/:[^:]*$/, '');
+	var ajaxParams = getJsonObject(a, /PrimeFaces.ab\s*\(\s*/, replaceHtmlEntities);
+	var formName = ajaxParams.s.replace(/:[^:]*$/, '');
 
 	var form = getElement(html, new RegExp('<form[^>]+name="' + formName + '"', 'i'));
 	if(!form){
 		AnyBalance.trace(html);
 		throw new AnyBalance.Error('Не удалось найти форму перехода по ссылке ' + reName.source);
 	}
-	var params = createFormParams(form);
+	var params = createFormParams(form, skipButtons);
 	
 	params['javax.faces.partial.ajax'] = 'true';
-	params['javax.faces.source'] = ajaxParams.source;
+	params['javax.faces.source'] = ajaxParams.s;
 	params['javax.faces.partial.execute'] = '@all';
-	params[ajaxParams.source] = ajaxParams.source;
+	params[ajaxParams.s] = ajaxParams.s;
 
-	for(var i=0; ajaxParams.params && i<ajaxParams.params.length; ++i){
-		var p = ajaxParams.params[i];
+	for(var i=0; ajaxParams.pa && i<ajaxParams.pa.length; ++i){
+		var p = ajaxParams.pa[i];
 		params[p.name] = p.value;
 	}
 
@@ -92,16 +102,16 @@ function main() {
 		throw new AnyBalance.Error('Ошибка при подключении к сайту провайдера! Попробуйте обновить данные позже.');
 
 	if(!isLoggedIn(html)){
-		var form = getElement(html, /<form[^>]+name="center"/i);
+		var form = getElement(html, /<form[^>]+name="frmLogin"/i);
 		if(!form){
 			AnyBalance.trace(html);
 			throw new AnyBalance.Error('Не удалось найти форму входа. Сайт изменен?');
 		}
 
 		var params = AB.createFormParams(form, function(params, str, name, value) {
-			if (name == 'center:login') {
+			if (name == 'frmLogin:login') {
 				return prefs.login;
-			} else if (name == 'center:keyboard') {
+			} else if (name == 'frmLogin:password') {
 				return prefs.password;
 			}
 	    
@@ -159,7 +169,7 @@ function processCards(html, baseurl, result){
 		var tds = getElements(tr, /<td/ig);
 		var name = getParam(tds[3], null, null, null, replaceTagsAndSpaces);
 		var num = getParam(name, null, null, /\(([^)]*)\)$/i);
-		if(!prefs.cardnum || endsWith(num, prefs.cardnum)){
+		if(!prefs.cardnum || endsWith(num.replace(/\s+/g, ''), prefs.cardnum.replace(/\s+/g, ''))){
 			getParam(num, result, 'card_number');
 			getParam(name, result, 'card_type', /[^(]*/i, replaceTagsAndSpaces);
 			result.acc_number = getParam(tds[6], null, null, null, replaceTagsAndSpaces);
@@ -196,7 +206,7 @@ function processAccounts(html, baseurl, acc_number, result){
 	for(var i=0; i<trs.length; ++i){
 		var tr = trs[i];
 		var num = getParam(tr, null, null, /(?:[\s\S]*?<td[^>]*>){3}([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
-		if(!acc_number || endsWith(num, acc_number)){
+		if(!acc_number || endsWith(num.replace(/\s+/g, ''), acc_number.replace(/\s+/g, ''))){
 			getParam(num, result, 'acc_number');
 			getParam(tr, result, 'acc_type', /(?:[\s\S]*?<td[^>]*>){4}([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
 			getParam(tr, result, 'balance', /(?:[\s\S]*?<td[^>]*>){6}([\s\S]*?)<\/td>/i, replaceTagsAndSpaces, parseBalance);

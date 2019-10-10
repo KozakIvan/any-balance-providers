@@ -12,7 +12,7 @@ var g_headers = {
 
 function main() {
 	var prefs = AnyBalance.getPreferences();
-	var baseurl = 'http://www.obed.ru/';
+	var baseurl = 'https://www.obed.ru/';
 	AnyBalance.setDefaultCharset('utf-8');
 	
 	AB.checkEmpty(prefs.login, 'Введите логин!');
@@ -25,7 +25,7 @@ function main() {
 		throw new AnyBalance.Error('Ошибка при подключении к сайту провайдера! Попробуйте обновить данные позже.');
 	}
 	
-	html = AnyBalance.requestPost(baseurl + 'registration/getPassword/', {
+	html = AnyBalance.requestPost(baseurl, {
 		'f_login': prefs.login,
 		'f_password': prefs.password
 	}, AB.addHeaders({Referer: baseurl}));
@@ -44,7 +44,7 @@ function main() {
 	if(isAvailable('balance')) {
 		html = AnyBalance.requestGet(baseurl + 'staff/balance', g_headers);
 		
-		AB.getParam(html, result, 'balance', /Свободных\s+средств([\s\S]*?)<\//i, AB.replaceTagsAndSpaces, AB.parseBalance);
+		AB.getParam(html, result, 'balance', /Средств\s+на\s+счете([\s\S]*?)<\//i, AB.replaceTagsAndSpaces, AB.parseBalance);
 	}
 	
 	AB.getParam(html, result, 'fio', /class="ob-lk__name[^>]*>([\s\S]*?)<\//i, AB.replaceTagsAndSpaces);

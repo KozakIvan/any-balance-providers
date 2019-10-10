@@ -15,7 +15,7 @@ function main(){
     if(AnyBalance.getLevel() < 6)
         throw new AnyBalance.Error('Этот провайдер требует AnyBalance API v.6+');
 
-    //AnyBalance.setOptions({SSL_ENABLED_PROTOCOLS: ['SSLv3']});
+    AnyBalance.setOptions({SSL_ENABLED_PROTOCOLS: ['TLSv1.2']});
 
     var baseurl = "https://ibank.asb.by/";
     AnyBalance.setDefaultCharset('utf-8');
@@ -33,7 +33,7 @@ function main(){
         throw new AnyBalance.Error("Неправильно введены коды 31-40! Необходимо ввести 10 четырехзначных кодов через пробел.");
       
     var html = AnyBalance.requestGet(baseurl + 'wps/portal/ibank/');
-    var url = getParam(html, /<form[^>]+action="\/([^"]*)"[^>]*name="LoginForm1"/i, replaceHtmlEntities);
+    var url = getParam(html, /<form[^>]+action="([^"]*)"[^>]*name="LoginForm1"/i, replaceHtmlEntities);
     if(!url){
         var error = getParam(html, /<font[^>]+color="#FF0000"[^>]*>([\s\S]*?)<\/font>/i, replaceTagsAndSpaces);
         if(!error)
@@ -44,7 +44,7 @@ function main(){
         throw new AnyBalance.Error('Не удалось найти форму входа. Сайт изменен?');
     }
 
-    var htmlCodePage = html = AnyBalance.requestPost(baseurl + url, {
+    var htmlCodePage = html = AnyBalance.requestPost(joinUrl(AnyBalance.getLastUrl(), url), {
         bbIbUseridField:prefs.login,
         bbIbPasswordField:prefs.password,
         bbIbLoginAction:'in-action',
@@ -68,13 +68,13 @@ function main(){
     if(!codes)
         throw new AnyBalance.Error('Не введены коды ' + (col+1) + '1-' + (col+2) + '0');
 
-	var form = getParam(html, /<form[^>]+action="\/wps\/portal\/ibank\/[^"]*"[^>]*name="LoginForm1"[\s\S]*?<\/form>/i);
+	var form = getParam(html, /<form[^>]+action="[^"]*"[^>]*name="LoginForm1"[\s\S]*?<\/form>/i);
 	if(!form){
         AnyBalance.trace(html);
 		throw new AnyBalance.Error('Не удалось найти форму ввода кода. Сайт изменен?');
 	}
 
-	var url = getParam(form, /<form[^>]+action="\/([^"]*)"[^>]*name="LoginForm1"/i, replaceHtmlEntities);
+	var url = getParam(form, /<form[^>]+action="([^"]*)"[^>]*name="LoginForm1"/i, replaceHtmlEntities);
     /*if(!url)
         throw new AnyBalance.Error('Не удалось найти форму ввода кода. Сайт изменен?');*/
 
@@ -92,7 +92,7 @@ function main(){
 	
 	params.bbIbLoginAction = 'in-action';
 	
-    html = AnyBalance.requestPost(baseurl + url, params);
+    html = AnyBalance.requestPost(joinUrl(AnyBalance.getLastUrl(), url), params);
 
     if(!/portalLogoutLink/i.test(html)){
         var error = getParam(html, /<p[^>]+class="warning"[^>]*>([\s\S]*?)<\/p>/i, replaceTagsAndSpaces);
@@ -139,10 +139,9 @@ function findAccount(html){
     	cards = getElements(account, [/<table[^>]+id="[^"]*ClientCardsDataForm:accountContainer:[^>]*>/ig, /<td[^>]+class="tdNumber"/i]);
     	var cardnums = sumParam(account, /<td[^>]+class="tdNumber"[^>]*>([\s\S]*?)<\/td>/ig, replaceTagsAndSpaces);
     	
-    	var ok = !prefs.lastdigits || endsWith(accnum, prefs.lastdigits);
-    	for(var j=0; !ok && j<cards.length; ++j){
-    		card = cards[j];
-    		cardnum = getParam(card, /<td[^>]+class="tdNumber"[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
+    	var ok = !prefs.lastdigits || endsWith(accnum.replace(/\s+/g, ''), prefs.lastdigits);
+    	for(var j=0; !ok && j<cardnums.length; ++j){
+    		cardnum = cardnums[j];
     		ok = ok || endsWith(cardnum, prefs.lastdigits);
     	}
 
@@ -164,7 +163,7 @@ function fetchCard(baseurl, html){
     var prefs = AnyBalance.getPreferences();
 
     if(prefs.lastdigits && !/^\d{4,}$/.test(prefs.lastdigits))
-        throw new AnyBalance.Error("Надо указывать 4 последних цифры карты или счета или не указывать ничего");
+        throw new AnyBalance.Error("Надо указывать 4 последних цифры карты или не менее 4 последних цифр счета счета или не указывать ничего");
 
 	var href = getParam(html, /href="\/([^"]+)"(?:[^>]*>){1,2}\s*Счета с карточкой/i, replaceTagsAndSpaces);
 	checkEmpty(href, 'Не удалось найти ссылку на счета, сайт изменен?', true);
@@ -179,7 +178,7 @@ function fetchCard(baseurl, html){
     	//Надо заново получить всё.
     	var cardId = getParam(info.card, /<td[^>]+class="tdId"[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
     	var form = getParam(html, /<form[^>]+id="[^"]*:ClientCardsDataForm"[^>]*>[\s\S]*?<\/form>/i);
-    	var action = getParam(form, /<form[^>]+action="([^"]*)/i, replaceHtmlEntities);
+    	var action = getParam(form, /<form[^>]+action="([^"#]*)/i, replaceHtmlEntities);
 		var params = createFormParams(form, function(params, str, name, value) {
 			if (/acctIdSelField/i.test(name) || name == 'accountNumber') 
 				return info.accnum;
@@ -195,11 +194,19 @@ function fetchCard(baseurl, html){
 
 		html = AnyBalance.requestPost(baseurl + action, params, addHeaders({'Referer': baseurl}));
 		info = findAccount(html);
+		if(!info) {
+			AnyBalance.trace(html);
+			throw new AnyBalance.Error('Не удалось найти информацию по доп. карте! Сайт изменен?');
+		}
     }
 	
     var result = {success: true};
-	
-    getParam(info.card, result, 'cardnum', /<td[^>]*class="tdNumber">([^]*?)<\/td>/, replaceTagsAndSpaces);
+
+	if(info.cardnum)
+    	getParam(info.cardnum, result, 'cardnum');
+    else
+    	getParam(info.card, result, 'cardnum', /<td[^>]*class="tdNumber">([^]*?)<\/td>/, replaceTagsAndSpaces);
+
     getParam(info.card, result, 'cardaccnum', /<td[^>]+class="tdId"[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces);
 	getParam(info.account, result, '__tariff', /<td[^>]*class="tdAccountText">([^]*?)<\/td>/, replaceTagsAndSpaces);
 	if(info.accnum == 'ExtraCardsAccount'){

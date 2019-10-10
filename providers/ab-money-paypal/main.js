@@ -126,7 +126,8 @@ function executeChallenge(script, baseurl, loginPage){
 		document: createGetInterceptor(doc, 'document'),
 		XMLHttpRequest: createGetInterceptor(XHR, 'XHR'),
 		navigator: createGetInterceptor({
-			appName: 'Netscape'
+			appName: 'Netscape',
+			userAgent: g_headers['User-Agent'],
 		}, 'navigator'),
 		screen: createGetInterceptor({
 			height: 1080,
@@ -136,7 +137,10 @@ function executeChallenge(script, baseurl, loginPage){
 		innerHeight: 680,
 		location: createGetInterceptor({
 			host: "www.paypal.com"
-		}, 'location')
+		}, 'location'),
+		console: createGetInterceptor({
+			log: AnyBalance.trace
+		}, 'console'),
 	};
 
 	var winProxy = createGetInterceptor(win, 'window');
@@ -178,42 +182,27 @@ function faceChallenge(html, baseurl){
 function faceCaptchaChallenge(json, baseurl, loginPage, debugId){
 	AnyBalance.trace('Challenge in: ' + JSON.stringify(json));
 
-	var script = getElements(json.htmlResponse, [/<script[^>]*>/ig, /autosubmit/], [/^<script[^>]*>|<\/script>/ig, '', replaceHtmlEntities], decodeURIComponent)[0];
-	if(!script){
-		AnyBalance.trace(html);
-		throw new AnyBalance.Error('Could not find challenge script. Is site changed?');
+	var form = getElement(json.htmlResponse, /<form[^>]+proceed/i);//, [/<noscript>[\s\S]*?<\/noscript>/ig, '']); 
+	if(!form){
+		AnyBalance.trace(json.htmlResponse);
+		throw new AnyBalance.Error('Could not find captcha form. Is site changed?');
 	}
 
-	var params_challenge = executeChallenge(script, baseurl, loginPage);
-	var captchaRequired = params_challenge.captchaRequired;
-	params_challenge.captchaRequired = undefined;
+	var captchaRequired = !/data-disable-autosubmit="false"/i.test(json.htmlResponse);
 
-	var params = AB.createFormParams(json.htmlResponse, function(params, str, name, value) {
-		if (name == 'captcha') {
-			if(captchaRequired){
-				AnyBalance.trace('Captcha строго требуется. Надо её ввести');
-				var imageUrl = getParam(json.htmlResponse, null, null, /<img[^>]+src="([^"]*secret.jpe?g)"/i, replaceHtmlEntities);
-				if(!imageUrl){
-					AnyBalance.trace(json.htmlResponse);
-					throw new AnyBalance.Error("Could not find captcha. Is the site changed?");
-				}
-				var image = AnyBalance.requestGet(imageUrl, addHeaders({Referer: loginPage}));
-				return AnyBalance.retrieveCode("Type the characters you see in the image for security purposes.", image);
-			}else{
-          		return ''; //Они тупо пустую капчу сабмитят...
-          	}
-		}
+	var params = AB.createFormParams(form);
+	if(captchaRequired){
+		AnyBalance.trace('Captcha is required');
+		params.recaptcha = solveRecaptcha('Please, prove you are not a robot', baseurl, '6LepHQgUAAAAAFOcWWRUhSOX_LNu0USnf7Vg6SyA');
+	}
 	
-		return value;
-	});
-	
-	var submitUrl = getParam(json.htmlResponse, null, null, /<form[^>]+action="([^"]*)/i, replaceHtmlEntities);
+	var submitUrl = getParam(form, /<form[^>]+action="([^"]*)/i, replaceHtmlEntities);
 	if(!submitUrl){
 		AnyBalance.trace(json.htmlResponse);
 		throw new AnyBalance.Error("Could not find captcha submit url. Is the site changed?");
 	}
 
-	html = AnyBalance.requestPost(joinUrl(baseurl, submitUrl), joinObjects(params, params_challenge), addHeaders({
+	html = AnyBalance.requestPost(joinUrl(baseurl, submitUrl), params, addHeaders({
 		Accept: 'application/json, text/javascript, */*; q=0.01',
 		Referer: loginPage,
 		Origin: baseurl,
@@ -319,20 +308,8 @@ function faceStepUp(json, baseurl, loginPage){
 
 }
 
-function logInSite(){
-	AnyBalance.trace('Пытаемся зайти через сайт...');
-
+function getJsonBalances(baseurl){
 	var prefs = AnyBalance.getPreferences();
-	var baseurl = 'https://www.paypal.com';
-	
-	g_headers = {
-		Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-		'Accept-Language': 'ru,en-US;q=0.8,en;q=0.6',
-		'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1'
-	};
-
-	AnyBalance.restoreCookies();
-
 	var html = AnyBalance.requestGet(baseurl + '/myaccount/wallet', g_headers);
 	var jsonBalances = getBalanceInfo(html);
 	if(!jsonBalances){
@@ -403,7 +380,7 @@ function logInSite(){
 		if(!jsonBalances){
 			AnyBalance.trace('Got json on enter: ' + JSON.stringify(json));
 			AnyBalance.trace("wallet page: " + html);
-			throw new AnyBalance.Error('Could not enter PayPal personal account...');
+			return jsonBalances;
 		}
 
 		AnyBalance.saveCookies();
@@ -411,6 +388,29 @@ function logInSite(){
 		__setLoginSuccessful();
 	}else{
 		AnyBalance.trace('Вошли через существующую сессию');
+	}
+
+	return jsonBalances;
+}
+
+function logInSite(){
+	AnyBalance.trace('Пытаемся зайти через сайт...');
+
+	var prefs = AnyBalance.getPreferences();
+	var baseurl = 'https://www.paypal.com';
+	
+	g_headers = {
+		Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+		'Accept-Language': 'ru,en-US;q=0.8,en;q=0.6',
+		'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1'
+	};
+
+	AnyBalance.restoreCookies();
+
+	var jsonBalances = getJsonBalances(baseurl);
+	if(!jsonBalances){
+		AnyBalance.trace('Could not enter PayPal. Let us try once more...');
+		jsonBalances = getJsonBalances(baseurl);
 	}
 
 	if(!jsonBalances){

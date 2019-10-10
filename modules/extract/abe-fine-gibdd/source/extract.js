@@ -26,7 +26,7 @@ function getGibddJson(html){
 }
 
 function requestFines(prefs) {
-    var baseurlUser = 'http://www.gibdd.ru/';
+    var baseurlUser = 'https://xn--90adear.xn--p1ai/';
     var baseurl = 'http://check.gibdd.ru/';
     AnyBalance.setDefaultCharset('utf-8');
 	
@@ -43,24 +43,14 @@ function requestFines(prefs) {
 	if(!found)
 		throw new AnyBalance.Error('Номер должен быть в формате а123вс190 либо 1234ав199, буквы русские.');
 	
-	var captcha = AnyBalance.requestGet(baseurl + 'proxy/captcha.jpg?', addHeaders({
-		Referer: baseurlUser + 'check/fines/',
-	}));
-	if (AnyBalance.getLastStatusCode() >= 400) {
-		AnyBalance.trace('Server returned for captcha: ' + AnyBalance.getLastStatusString());
-		throw new AnyBalance.Error('Капча на сервисе штрафов временно недоступна, скоро все снова будет работать.');
-	}
-	if(!captcha)
-		throw new AnyBalance.Error('Не удалось получить капчу. Временные проблемы на сайте или сайт изменен.');
+	var captcha = solveRecaptcha('Пожалуйста, докажите, что вы не робот', AnyBalance.getLastUrl(), JSON.stringify({SITEKEY: '6Lc66nwUAAAAANZvAnT-OK4f4D_xkdzw5MLtAYFL', TYPE: 'V3', ACTION: 'check_fines'}));
 
-	var captchaWord = AnyBalance.retrieveCode("Пожалуйста, введите код с картинки", captcha, {inputType: 'number'});
-	AnyBalance.trace('Капча получена: ' + captchaWord);
-	
 	var params2 = [
 		['regnum',found[1].toUpperCase()],
 		['regreg',found[2]],
 		['stsnum',prefs.password.toUpperCase()],
-		['captchaWord',captchaWord],
+		['captchaWord',''],
+		['reCaptchaToken', captcha],
 	];
 	
 	AnyBalance.trace('Пробуем запросить информацию с данными: '+prefs.login+', ' + prefs.password);
@@ -92,7 +82,7 @@ function parseFines(result, json) {
 		throw new AnyBalance.Error("Вероятно, Вами допущена ошибка при заполнении полей запроса.");
 	}
 	
-	AnyBalance.trace('Штрафов: ' + json.data.count);
+	AnyBalance.trace('Штрафов: ' + json.data.length);
 	
 	if(json.data.length > 0) {
 		result.fines = [];
@@ -121,7 +111,7 @@ function parseFines(result, json) {
 		getParam(json.data.length, result, 'count');
 		// Нет штрафов
 	} else {
-		result.descr = 'Неуплаченных штрафов в федеральной информационной системе ГИБДД по указанным данным не найдено.';
+		result.descr = 'Штрафов нет.';
 		result.count = 0;
 	}
 }

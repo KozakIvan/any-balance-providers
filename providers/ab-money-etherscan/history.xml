@@ -1,5 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <history>
+	<change version="8" date="2019-02-13">
+	- Поддержка изменений на сайте.
+	</change>
+	<change version="7" date="2018-08-30">
+	Fixed getting rate
+	</change>
+	<change version="6" date="2018-01-07">
+	Fixed getting rates over 1k$
+	</change>
+	<change version="5" date="2017-12-19">
+	Улучшена поддержка Cloudflare
+	</change>
+	<change version="4" date="2017-12-09">
+	Cloudflare support
+	</change>
 	<change version="3" date="2017-05-25">
 	Rounding USD
 	</change>

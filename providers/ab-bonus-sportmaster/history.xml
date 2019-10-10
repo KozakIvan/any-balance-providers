@@ -1,5 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <history>
+	<change version="25" date="2019-08-12">
+	- Поддержка изменений в процедуре входа.
+	</change>
+	<change version="24" date="2017-08-25">
+	- Улучшена обработка ошибок.
+	</change>
+	<change version="23" date="2017-08-25">
+	- Поддержка изменений на сайте.
+	</change>
 	<change version="22" date="2017-07-24">
 	Добавлено отображение срока действия бонусов
 	</change>

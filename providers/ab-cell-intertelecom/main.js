@@ -33,6 +33,7 @@ function main() {
     getParam(html, result, 'bonus', /<td[^>]*>\s*Неактивированные бонусы \(с 094\)\s*<\/td>\s*<td[^>]*>([^<]*)<\/td>/i, replaceTagsAndSpaces, parseBalance);
     //Предоплачение ИТ(местные+Украина+моб.094)+Местные
     getParam(html, result, 'min_it', /<td[^>]*>[^<]*ИТ\(местные\+Украина\+моб.094\)\+Местные[^<]*<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces, parseSeconds);
+    getParam(html, result, 'min_it', /<td[^>]*>[^<]*ИТ\(местные\+Украина\+моб.094\)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces, parseSeconds);
     //Предоплачение местные минуты
     getParam(html, result, 'min_local', /<td>Местные<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>/i, replaceTagsAndSpaces, parseSeconds);
     //Предоплачение местные минуты и по Украине
@@ -58,6 +59,8 @@ function main() {
     sumParam(html, result, 'bonus_fb', /<td[^>]*>\s*Бонус [^>]*На лето[^>]*\s*[^>]*на доп.услуги[^>]*\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^<]*\)\s*<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
     //Бонус за регистрацию в АССА
     sumParam(html, result, 'bonus_fb', /<td[^>]*>\s*Бонус регистрация АССА\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^<]*\)\s*<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
+    //Бонус исключительно на АП
+    sumParam(html, result, 'bonus_fb', /<td[^>]*>\s*Бонус исключительно на АП\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^<]*\)\s*<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
     //Бонус «Вільний доступ»    [^>]*<\/td>
     getParam(html, result, 'bonus_vd', /<td[^>]*>\s*Бонус [^>]*Вільний доступ[^>]*\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^>]*\)\s*<\/td>/i, replaceTagsAndSpaces, parseBalance);
     //Бонус при пополнении счета через Portmone + Лояльный Бонус
@@ -66,6 +69,7 @@ function main() {
     sumParam(html, result, 'bonus_pr', /<td[^>]*>\s*Бонус Debtors \(без АП\)[^>]*\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^<]*\)\s*<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
     sumParam(html, result, 'bonus_pr', /<td[^>]*>\s*Бесплатная смена пакета \(шт\.\)[^>]*\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^<]*\)\s*<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
     sumParam(html, result, 'bonus_pr', /<td[^>]*>\s*Бонус за пополнение[^>]*\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^<]*\)\s*<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
+    sumParam(html, result, 'bonus_pr', /<td[^>]*>\s*Бонус на все услуги[^>]*\s*<\/td>\s*<td[^>]*>([\s\S]*?) \([^<]*\)\s*<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
     //СМС по Украине
     sumParam(html, result, 'sms_ukr', />\s*сеть ИТ\+CDMA\+GSM операторов\s*<[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/ig, replaceTagsAndSpaces, parseBalance, aggregate_sum);
     //Срок действия СМС по Украине
@@ -80,12 +84,16 @@ function main() {
     sumParam(html, result, 'date_bonus_fb', /<td[^>]*>\s*Бонус [^>]*На лето[^>]*\s*[^>]*на доп.услуги[^>]*\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     //Дата Бонус за регистрацию в АССА
     sumParam(html, result, 'date_bonus_fb', /<td[^>]*>\s*Бонус регистрация АССА\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
+    //Дата Бонус исключительно на АП
+    sumParam(html, result, 'date_bonus_fb', /<td[^>]*>\s*Бонус исключительно на АП\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     //Дата "Бонус при пополнении счета через Portmone" + Лояльный Бонус
     sumParam(html, result, 'date_bonus_pr', /<td[^>]*>\s*Бонус при поповненні рахунку через Portmone[^>]*\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     sumParam(html, result, 'date_bonus_pr', /<td[^>]*>\s*Лояльный Бонус[^>]*\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     sumParam(html, result, 'date_bonus_pr', /<td[^>]*>\s*Бесплатная смена пакета \(шт\.\)[^>]*\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     sumParam(html, result, 'date_bonus_pr', /<td[^>]*>\s*Бонус за пополнение[^>]*\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
+    sumParam(html, result, 'date_bonus_pr', /<td[^>]*>\s*Бонус на все услуги[^>]*\s*<\/td>\s*<td[^>]*>\s*.* \(по ([^<]*)\)\s*<\/td>/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     //Дата минуты
+    sumParam(html, result, 'date_min_it', /<td[^>]*>[^<]*ИТ\(местные\+Украина\+моб.094\)<\/td>\s*<td[^>]*>[\s\S]*? по ([^<]*)</ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     sumParam(html, result, 'date_min_uk_mob_uk', /<td[^>]*>[\s\S]*?Украина\+Моб\.Украина[^<]*<\/td>\s*<td[^>]*>[\s\S]*? по ([^<]*)</ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     sumParam(html, result, 'date_min_uk_mob_uk', /<td>[^<]*Вся\s*Украина\s*\[Подарок\][^<]*<\/td>\s*<td[^>]*>[\s\S]*? по ([^<]*)/ig, replaceTagsAndSpaces, parseDate, aggregate_min);
     sumParam(html, result, 'date_min_uk_mob', /<td>[^<]*Украина\s*\(моб.?\)\s*[^<]*<\/td>\s*<td[^>]*>[\s\S]*? по ([^<]*)</ig, replaceTagsAndSpaces, parseDate, aggregate_min);

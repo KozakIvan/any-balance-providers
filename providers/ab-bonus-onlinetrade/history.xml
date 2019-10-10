@@ -1,5 +1,18 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <history>
+	<change version="8" date="2019-02-22">
+	- Поддержка изменений на сайте.
+	</change>
+	<change version="7" date="2019-01-10">
+	Исправления в процедуре входа
+	</change>
+	<change version="6" date="2019-01-10">
+	- Поддержка изменений на сайте
+	</change>
+	<change version="5" date="2018-07-30">
+	- Поддержка изменений в процедуре входа
+	- Поддержка капчи
+	</change>
 	<change version="4" date="2016-12-12">
 	- Поддержка изменений на сайте.
 	</change>

@@ -1,5 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <history>
+	<change version="44" date="2019-08-21">
+	Поддержка рекапчи
+	</change>
+	<change version="43" date="2019-08-02">
+	- Поддержка изменений на сайте.
+	</change>
+	<change version="42" date="2018-12-24">
+	- Поддержка изменений на сайте.
+	</change>
+	<change version="41" date="2018-05-15">
+	- Улучшена обработка ошибок.
+	</change>
+	<change version="40" date="2017-12-04">
+	- Полностью изменился личный кабинет
+	</change>
 	<change version="39" date="2017-01-10">
 	- Улучшена обработка ошибок в случае запроса капчи
 	</change>
